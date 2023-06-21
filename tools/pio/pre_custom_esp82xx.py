@@ -56,6 +56,7 @@ else:
     "-DUSES_C016",  # Cache Controller
     "-DUSES_C018",  # TTN/RN2483
 #   "-DUSES_C015",  # Blynk
+    "-DUSES_P153",  # Hosea ************************************************************************************************
 
 #    "-DFEATURE_MDNS=1",
 #    "-DFEATURE_SD=1",
