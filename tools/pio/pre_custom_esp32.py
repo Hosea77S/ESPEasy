@@ -28,6 +28,7 @@ else:
     "-DUSES_P002",  # ADC
     "-DUSES_P003",  # Generic pulse counter
     "-DUSES_P004",  # Dallas DS18b20
+    "-DUSES_P012", ########### LCD
     "-DUSES_P026",  # System info
     "-DUSES_P027",  # INA219
     "-DUSES_P028",  # BME280
@@ -43,10 +44,11 @@ else:
     "-DUSES_P081",  # Cron
     "-DUSES_P082",  # GPS
     "-DUSES_P085",  # AcuDC24x
+    "-DUSES_P091",  ############ SerialSwitch
     "-DUSES_P098",  # PWM motor
 
     "-DUSES_P100",  # Pulse Counter - DS2423
-#   "-DUSES_P087",  # Serial Proxy
+    "-DUSES_P087",  # Serial Proxy
 #   "-DUSES_P094",  # CUL Reader
 #   "-DUSES_P095",  # TFT ILI9341
     "-DUSES_P097",  # Touch (ESP32)
@@ -54,6 +56,7 @@ else:
     "-DUSES_P107",  # SI1145 UV index
 
     "-DUSES_P146",  # Cache Reader
+    "-DUSES_P153", ######### Hosea
     
 
     "-DUSES_C016",  # Cache Controller

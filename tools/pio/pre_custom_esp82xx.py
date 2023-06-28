@@ -29,6 +29,7 @@ else:
     "-DUSES_P002",  # ADC
     "-DUSES_P003",  # Generic Pulse Counter
     "-DUSES_P004",  # Dallas DS18b20
+    "-DUSES_P012", ########### LCD
     "-DUSES_P026",  # System info
     "-DUSES_P027",  # INA219
     "-DUSES_P028",  # BME280
