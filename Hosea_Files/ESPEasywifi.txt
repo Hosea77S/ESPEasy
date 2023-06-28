@@ -1,0 +1,49 @@
+https://www.letscontrolit.com/forum/viewtopic.php?t=1607
+Make sure you understand where the problem is, then you can do a basic configuration from the CLI by giving these commands:
+
+    wifiscan (scans for SSID of nearby access points and returns the RSSI, -40 is a strong signal, -80 a weak one)
+    wifissid (tells ESPEasy which SSID to use)
+    wifikey (tells ESPEasy which WPA key to use)
+    wificonnect (connects to the wifi networks)
+    save (saves the parameters to flash)
+    settings (shows some basic parameters such as IP address and SSID/key)
+
+wifiscan 
+wifissid GODMACHINE8454
+wifikey dogman778
+wificonnect 
+save 
+settings 
+
+wifistamode
+-----
+On System#Boot do
+ timerSet,1,10
+endon
+
+On Rules#Timer=1 do
+ logEntry,'Hosea'
+ timerSet,1,10
+endon
+------
+On BMV#V* do
+ logEntry,'%eventvalue1%'
+endon
+------
+On BMV#V* do
+ logEntry,'Helloooo'
+ logEntry,'{substring:3:6:%eventvalue1%}'
+ asyncevent,BMVValues={substring:3:6:%eventvalue1%}
+endon
+
+on BMVValues do
+ logEntry,'BMV Voltage = %eventvalue1%'
+ TaskValueSet 4,1,%eventvalue%
+endon
+-----
+
+D1 - SCL
+D2 - SDA
+SDA-yellow SCL-white 3v3-red GND-black
+GND-yellow 3v3-white SCL-red SDA-black
+
