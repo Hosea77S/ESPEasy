@@ -3,11 +3,11 @@
 # include "../../_Plugin_Helper.h"
 # include <ESPeasySerial.h>
 
-# define P153_FIRST_FILTER_POS   6
-# define P153_NR_FILTERS         10
-# define P153_Nlines             (P153_FIRST_FILTER_POS + 3 * (P153_NR_FILTERS))
-# define P153_Nchars             128
-# define P153_MAX_CAPTURE_INDEX  32
+# define P153_FIRST_FILTER_POS   6//remove
+# define P153_NR_FILTERS         10//remove
+# define P153_Nlines             (P153_FIRST_FILTER_POS + 3 * (P153_NR_FILTERS))//change
+# define P153_Nchars             128 //investigate
+# define P153_MAX_CAPTURE_INDEX  32 //investigate
 # define P153_S0                 0
 # define P153_S1                 1
 # define P153_S2                 2
@@ -46,9 +46,9 @@ public:
 
     void getSentencesReceived(  uint32_t& succes,
                                 uint32_t& error,
-                                uint32_t& length_last) const;
+                                uint32_t& length_last) const;//change
 
-    void setMaxLength(uint16_t maxlenght);
+    void setMaxLength(uint16_t maxlenght); //Remove
 
     // EISH:
     void setLine(uint8_t varNr,
@@ -64,10 +64,10 @@ private:
     ESPeasySerial *easySerial = nullptr;
     String         sentence_part;
     String         last_sentence;
-    uint16_t       max_length               = 550;
+    uint16_t       max_length               = 550; //Remove
     uint32_t       sentences_received       = 0;
     uint32_t       sentences_received_error = 0;
-    uint32_t       length_last_received     = 0;
+    uint32_t       length_last_received     = 0; //change
     uint8_t        currentState = P153_S0;
     uint8_t        nextState = P153_S0;
 };
