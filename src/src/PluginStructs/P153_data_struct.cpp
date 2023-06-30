@@ -210,7 +210,7 @@ void P153_data_struct::setMaxLength(uint16_t maxlenght)
 // EISH: not sure about this
 void P153_data_struct::setLine(uint8_t varNr, const String& line) 
 {
-    if (varNr < P153_Nlines) 
+    if (varNr < P153_NR_lines) 
     {
         _lines[varNr] = line;
     }

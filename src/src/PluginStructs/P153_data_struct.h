@@ -3,11 +3,10 @@
 # include "../../_Plugin_Helper.h"
 # include <ESPeasySerial.h>
 
-# define P153_FIRST_FILTER_POS   6//remove
-# define P153_NR_FILTERS         10//remove
-# define P153_Nlines             (P153_FIRST_FILTER_POS + 3 * (P153_NR_FILTERS))//change
-# define P153_Nchars             128 //investigate
-# define P153_MAX_CAPTURE_INDEX  32 //investigate
+# define P153_FIRST_LABEL_POS    6
+# define P153_NR_FIELD_LABELS    4
+# define P153_NR_lines           (P153_FIRST_LABEL_POS + P153_NR_FIELD_LABELS)
+# define P153_NR_FORM_chars      10 // used for num chars in textbox
 # define P153_S0                 0
 # define P153_S1                 1
 # define P153_S2                 2
@@ -48,14 +47,14 @@ public:
                                 uint32_t& error,
                                 uint32_t& length_last) const;//change
 
-    void setMaxLength(uint16_t maxlenght); //Remove
+    void setMaxLength(uint16_t maxlenght); 
 
-    // EISH:
+    // EISH: 
     void setLine(uint8_t varNr,
                 const String& line);
     // EISH:
     // Made public so we don't have to copy the values when loading/saving.
-    String _lines[P153_Nlines];
+    String _lines[P153_NR_lines];
 
 private:
 
@@ -64,7 +63,7 @@ private:
     ESPeasySerial *easySerial = nullptr;
     String         sentence_part;
     String         last_sentence;
-    uint16_t       max_length               = 550; //Remove
+    uint16_t       max_length               = 20; //Change
     uint32_t       sentences_received       = 0;
     uint32_t       sentences_received_error = 0;
     uint32_t       length_last_received     = 0; //change

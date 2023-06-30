@@ -143,15 +143,15 @@ boolean Plugin_153(uint8_t function, struct EventStruct *event, String& string)
 			
 			// EISH:
 			// if ptr successfully created
-			// // add web args for each VarNr
+			// // add web args for each line_Nr
 			// // HOLDON: Add something called HtmlError????
 			if (nullptr != P153_data) {
-			for (uint8_t varNr = 0; varNr < P153_Nlines; varNr++)
+			for (uint8_t line_Nr = 0; line_Nr < P153_NR_lines; line_Nr++)
 			{
-				P153_data->setLine(varNr, webArg(getPluginCustomArgName(varNr)));
+				P153_data->setLine(line_Nr, webArg(getPluginCustomArgName(line_Nr)));
 			}
 
-				addHtmlError(SaveCustomTaskSettings(event->TaskIndex, P153_data->_lines, P153_Nlines, 0));
+				addHtmlError(SaveCustomTaskSettings(event->TaskIndex, P153_data->_lines, P153_NR_lines, 0));
 				success = true;
 			}
 
@@ -185,7 +185,7 @@ boolean Plugin_153(uint8_t function, struct EventStruct *event, String& string)
 			// else
 			// // Clear Plugin Task Data
 			if (P153_data->init(port, serial_rx, serial_tx, P153_BAUDRATE, static_cast<uint8_t>(P153_SERIAL_CONFIG))) {
-				LoadCustomTaskSettings(event->TaskIndex, P153_data->_lines, P153_Nlines, 0);
+				LoadCustomTaskSettings(event->TaskIndex, P153_data->_lines, P153_NR_lines, 0);
 				//P087_data->post_init();
 				success = true;
 				serialHelper_log_GpioDescription(port, serial_rx, serial_tx);
