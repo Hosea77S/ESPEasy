@@ -40,6 +40,16 @@ on BMVValues do
  logEntry,'BMV Voltage = %eventvalue1%'
  TaskValueSet 4,1,%eventvalue%
 endon
+
+-----
+On MPPT#Value* do
+ asyncevent,MPPTValue={substring:10:15:%eventvalue1%}
+endon
+
+on MPPTValue do
+ logEntry,'MPPT Voltage = %eventvalue1%'
+ TaskValueSet 4,1,%eventvalue%
+endon
 -----
 ESP8266
 D1 - SCL

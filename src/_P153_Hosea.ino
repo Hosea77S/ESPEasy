@@ -56,8 +56,8 @@ boolean Plugin_153(uint8_t function, struct EventStruct *event, String& string)
 		{
 			for (uint8_t i = 0; i < VARS_PER_TASK; ++i) {
 				if (i < P153_NR_OUTPUT_VALUES) {
-					const uint8_t pconfigIndex = i + P153_QUERY1_CONFIG_POS;
-					uint8_t choice             = PCONFIG(pconfigIndex);
+					//const uint8_t pconfigIndex = i + P153_QUERY1_CONFIG_POS;
+					//uint8_t choice             = PCONFIG(pconfigIndex);
 					safe_strncpy(
 						ExtraTaskSettings.TaskDeviceValueNames[i],
 						F("Value"),
@@ -122,8 +122,8 @@ boolean Plugin_153(uint8_t function, struct EventStruct *event, String& string)
 
 		case PLUGIN_WEBFORM_LOAD:
 		{
-			//addFormSubHeader(F("Filtering")); // TODO: in plugin data struct, change html code
-			//P153_html_show_matchForms(event); 
+			addFormSubHeader(F("MPPT LABELS SELECT")); 
+			P153_html_show_user_label_forms(event);
 
 			addFormSubHeader(F("Statistics")); // TODO: in plugin data struct, change html code
 			P153_html_show_stats(event);
@@ -146,12 +146,12 @@ boolean Plugin_153(uint8_t function, struct EventStruct *event, String& string)
 			// // add web args for each line_Nr
 			// // HOLDON: Add something called HtmlError????
 			if (nullptr != P153_data) {
-			for (uint8_t line_Nr = 0; line_Nr < P153_NR_lines; line_Nr++)
+			for (uint8_t line_Nr = 0; line_Nr < P153_NR_LINES; line_Nr++)
 			{
 				P153_data->setLine(line_Nr, webArg(getPluginCustomArgName(line_Nr)));
 			}
 
-				addHtmlError(SaveCustomTaskSettings(event->TaskIndex, P153_data->_lines, P153_NR_lines, 0));
+				addHtmlError(SaveCustomTaskSettings(event->TaskIndex, P153_data->_lines, P153_NR_LINES, 0));
 				success = true;
 			}
 
@@ -185,7 +185,7 @@ boolean Plugin_153(uint8_t function, struct EventStruct *event, String& string)
 			// else
 			// // Clear Plugin Task Data
 			if (P153_data->init(port, serial_rx, serial_tx, P153_BAUDRATE, static_cast<uint8_t>(P153_SERIAL_CONFIG))) {
-				LoadCustomTaskSettings(event->TaskIndex, P153_data->_lines, P153_NR_lines, 0);
+				LoadCustomTaskSettings(event->TaskIndex, P153_data->_lines, P153_NR_LINES, 0);
 				//P087_data->post_init();
 				success = true;
 				serialHelper_log_GpioDescription(port, serial_rx, serial_tx);
@@ -320,7 +320,51 @@ void P153_html_show_stats(struct EventStruct *event)
 		chksumStats += '/';
 		chksumStats += error;
 		addHtml(chksumStats);
-		addRowLabel(F("Length Last Sentence"));
+		addRowLabel(F("Length Last Sentence")); // Change Later along with checksum code
 		addHtmlInt(length_last);
+	}
+}
+
+void P153_html_show_user_label_forms(struct EventStruct *event)
+{
+	P153_data_struct *P153_data = 
+		static_cast<P153_data_struct *>(getPluginTaskData(event->TaskIndex));
+	// TODO: Try and turn this into a for loop. F("") gives me problems
+	if(nullptr != P153_data)
+	{
+		addFormNumericBox(
+				F("Number of Labels"),
+				getPluginCustomArgName(P153_NR_USER_LABELS_POS),
+				P153_data->get_Nr_User_Labels(),
+				0,
+				P153_MAX_NR_USER_LABELS
+
+		);
+
+		addFormTextBox(
+				F("LABEL 0"), 
+				getPluginCustomArgName(P153_FIRST_USER_LABEL_POS+0),
+				P153_data->get_User_Label(0),
+				P153_NR_FORM_chars
+		);
+		addFormTextBox(
+				F("LABEL 1"), 
+				getPluginCustomArgName(P153_FIRST_USER_LABEL_POS+1),
+				P153_data->get_User_Label(1),
+				P153_NR_FORM_chars
+		);
+		addFormTextBox(
+				F("LABEL 2"), 
+				getPluginCustomArgName(P153_FIRST_USER_LABEL_POS+2),
+				P153_data->get_User_Label(2),
+				P153_NR_FORM_chars
+		);
+
+		addFormTextBox(
+				F("LABEL 3"), 
+				getPluginCustomArgName(P153_FIRST_USER_LABEL_POS+3),
+				P153_data->get_User_Label(3),
+				P153_NR_FORM_chars
+		);
 	}
 }
