@@ -81,6 +81,7 @@ void P153_data_struct::sendData(uint8_t *data, size_t size)
 
 bool P153_data_struct::loop() 
 {
+    bool data_success = false;
     if (!isInitialized()) 
     {
         return false;
@@ -128,7 +129,7 @@ bool P153_data_struct::loop()
                     }
                     else
                     {
-                        nextState = P153_STATE_IDLE;
+                        reset_state_machine(fullDataReceived, nextState, currentState);
                     }
                     break;
                 }
@@ -143,6 +144,10 @@ bool P153_data_struct::loop()
                     {
                         nextState = P153_STATE_FIELD;
                         state_transitions[2] = P153_STATE_FIELD;
+                    }
+                    else if((c == '\r') || (c == '\n'))
+                    {
+                        reset_state_machine(fullDataReceived, nextState, currentState);
                     }
                     else
                     {
@@ -171,6 +176,10 @@ bool P153_data_struct::loop()
                         nextState = P153_STATE_IDLE;
                         state_transitions[3] = P153_STATE_IDLE;
                     }
+                    else if((c == '\t') || (c == '\n'))
+                    {
+                        reset_state_machine(fullDataReceived, nextState, currentState);
+                    }
                     else
                     {
                         data_table[field_count][P153_FIELD_IDX] += c;
@@ -188,13 +197,11 @@ bool P153_data_struct::loop()
                     // // save the data table to last table
                     // // reset field count, clear, data table, reset state transition array and set [0] <- IDLE
                     uint8_t final_index = P153_NR_FIELDS-1;
-                    if ( (field_count == final_index) || (data_table[final_index][P153_LABEL_IDX] == "Checksum") )
+                    if ( (field_count >= final_index) || (data_table[final_index][P153_LABEL_IDX] == "HSDS") )
                     {
                         fullDataReceived = true;
-                        save_to_last_data_table();
                         length_last_received = field_count;
                         field_count = 0;
-                        clear_data_table();
                         reset_state_transition();
                     }
                 
@@ -203,13 +210,16 @@ bool P153_data_struct::loop()
 
                 default:
                 {
-                    // clear state transition matrix
-                    reset_state_transition();
-                    // set next state to IDLE
-                    nextState = P153_STATE_IDLE;
+                    reset_state_machine(fullDataReceived, nextState, currentState);
                     break;
                 }
             } // end case
+
+            // filter out nonsense
+            if(c == ':')
+            {
+                //reset_state_machine(fullDataReceived, nextState, currentState);
+            }
 
             currentState = nextState;
         } // end while(available > 0 && !fullSentenceReceived)
@@ -219,30 +229,54 @@ bool P153_data_struct::loop()
     {
         ++full_data_received;
 
+        save_to_last_data_table();
+        clear_data_table();
+
+        data_success = fullDataReceived;
         fullDataReceived = false;
 
-        char received_checksum = (char)((last_data_table[P153_NR_FIELDS-1][P153_FIELD_IDX]).charAt(0));
+        // find checksum
+        char received_checksum = ' ';
+        for(int i=0; i<P153_NR_FIELDS; ++i)
+        {
+            if(last_data_table[i][P153_LABEL_IDX] == "Checksum")
+            {
+                received_checksum = (last_data_table[i][P153_FIELD_IDX]).charAt(0);
+            }
+        }
+
         compare_and_reset_checksum( received_checksum );
     }
 
-    return fullDataReceived;
+    return false;//data_success;
+}
+
+void P153_data_struct::reset_state_machine(bool& is_done, uint8_t& nextState, uint8_t currentState)
+{
+    nextState = P153_STATE_IDLE;
+    currentState = P153_STATE_IDLE;
+    last_checksum = 0;
+    field_count = 0;
+    clear_data_table();
+    reset_state_transition();
+    is_done = false;
+    full_data_received_error += 1;
 }
 
 bool P153_data_struct::getSentence(String& string) 
 {
     int nr_data_labels = get_Nr_User_Labels();
-    String user_data[nr_data_labels] = {""};
-    // Remove Later
-    //String user_labels[4] = {"V","BOOTY","LOAD","Checksum"};
+    String user_data[nr_data_labels]; // POTENTIAL ERROR
 
     for(int i = 0; i<nr_data_labels; ++i)
     {
         String label = get_User_Label(i);
-        get_Data_Label_and_Field(user_data[i], label);
-        //get_Data_Label_and_Field(user_data[i], user_labels[i]);
+        //get_Data_Label_and_Field(user_data[i], label);
+        get_Data_Field_Only(user_data[i], label);
     }
 
     get_flattened_data(string, user_data, nr_data_labels);
+    string += String(nr_data_labels) + "," + String(full_data_received_error);
 
     if (string.isEmpty()) 
     {
@@ -273,12 +307,6 @@ void P153_data_struct::setLine(uint8_t varNr, const String& line)
     }
 }
 
-bool P153_data_struct::max_length_reached() const 
-{
-    if (max_length == 0) { return false; }
-    return false;//sentence_part.length() >= max_length;
-}
-
 String P153_data_struct::get_User_Label(int idx)
 {
         int real_idx = P153_FIRST_USER_LABEL_POS + idx;
@@ -290,6 +318,11 @@ String P153_data_struct::get_User_Label(int idx)
         {
             return "";
         }
+}
+int P153_data_struct::get_Nr_User_LabelForms_Filled()
+{
+    // Not sure if i'll be successful with this function
+    return 1;
 }
 
 int P153_data_struct::get_Nr_User_Labels()
@@ -331,52 +364,97 @@ void P153_data_struct::clear_data_table()
 
 void P153_data_struct::get_Data_Label_and_Field(String& user_data, String& user_label)
 {
-  int golden_row = -1;
-  int num_empty_space = 0;
-
-  num_empty_space =  P153_MAX_LABEL_LENGTH - user_label.length();
-  user_data = user_label + repeat_char(' ',num_empty_space-1) + ":";
-
-  for (int row = 0; row < P153_NR_FIELDS; row++) 
-  {
-    if (last_data_table[row][P153_LABEL_IDX] == user_label) 
+    // if user label is empty
+    // // set user_data <- space
+    if(user_label == "")
     {
-      golden_row = row;
-      break;
+        user_data = String('?');
+        return;
     }
-  }
+    int golden_row = -1;
+    int num_empty_space = 0;
 
-  if(golden_row != -1)
-  {
-    num_empty_space =  P153_MAX_FIELD_LENGTH - (last_data_table[golden_row][P153_FIELD_IDX]).length();
-    user_data += last_data_table[golden_row][P153_FIELD_IDX] + repeat_char(' ',num_empty_space);
-  }
-  else
-  {
-    user_data += "ERR       ";
-  }
+    num_empty_space =  P153_MAX_LABEL_LENGTH - user_label.length();
+    user_data = user_label + repeat_char(' ',num_empty_space-1) + ":";
+
+    for (int row = 0; row < P153_NR_FIELDS; row++) 
+    {
+        if (last_data_table[row][P153_LABEL_IDX] == user_label) 
+        {
+            golden_row = row;
+            break;
+        }
+    }
+
+    if(golden_row != -1)
+    {
+        num_empty_space =  P153_MAX_FIELD_LENGTH - (last_data_table[golden_row][P153_FIELD_IDX]).length();
+        user_data += last_data_table[golden_row][P153_FIELD_IDX] + repeat_char(' ',num_empty_space);
+    }
+    else
+    {
+        user_data += "UNKNOWN   ";
+    }
   
-}String P153_data_struct::repeat_char(char c, int num)
+}
+
+void P153_data_struct::get_Data_Field_Only(String& user_data, String& user_label)
 {
-  if(num <= 1)
-  {
-    return "";
-  }
-  String result = String();
-  for(int i=0; i<num; ++i)
-  {
-    result += c;
-  }
-  return result;
+    user_data = "";
+    // if user label is empty
+    // // set user_data <- space
+    if(user_label == "")
+    {
+        user_data = String('?');
+        return;
+    }
+    int golden_row = -1;
+    int num_empty_space = 0;
+
+    for (int row = 0; row < P153_NR_FIELDS; row++) 
+    {
+        if (last_data_table[row][P153_LABEL_IDX] == user_label) 
+        {
+            golden_row = row;
+            break;
+        }
+    }
+
+    if(golden_row != -1)
+    {
+        user_data += last_data_table[golden_row][P153_FIELD_IDX] + String(',');
+    }
+    else
+    {
+        user_data += "0,";
+    }
+  
+}
+
+String P153_data_struct::repeat_char(char c, int num)
+{
+    if(num <= 1)
+    {
+        return "";
+    }
+    String result = String();
+    for(int i=0; i<num; ++i)
+    {
+        result += c;
+    }
+    return result;
 }
 
 void P153_data_struct::get_flattened_data(String& flattened_data, String* data_list, int num_data_fields)
 {
-  flattened_data = "";
-  for(int i=0; i<num_data_fields; ++i)
-  {
-    flattened_data += data_list[i];
-  }
+    flattened_data = "";
+    for(int i=0; i<num_data_fields; ++i)
+    {
+        if( data_list[i] != String('?'));
+        {
+            flattened_data += data_list[i];
+        }
+    }
 }
 
 void P153_data_struct::update_checksum(char c)
@@ -397,4 +475,3 @@ void P153_data_struct::compare_and_reset_checksum(char received_checksum)
   }
   last_checksum = 0;
 }
-//V        :12800

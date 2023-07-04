@@ -14,10 +14,10 @@
 # define P153_STATE_IDLE            1
 # define P153_STATE_LABEL           2
 # define P153_STATE_FIELD           3
-# define P153_MAX_LABEL_LENGTH      10
-# define P153_MAX_FIELD_LENGTH      10
+# define P153_MAX_LABEL_LENGTH      130
+# define P153_MAX_FIELD_LENGTH      130
 # define P153_NR_STATE_TRANS        4
-# define P153_NR_FIELDS             48 //MUST CHANGE
+# define P153_NR_FIELDS             20 //MUST CHANGE
 # define P153_LABEL_IDX             0
 # define P153_FIELD_IDX             1
 
@@ -67,22 +67,25 @@ public:
 
     int get_Nr_User_Labels();
 
+    int get_Nr_User_LabelForms_Filled();
+
     // EISH:
     // Made public so we don't have to copy the values when loading/saving.
     String _lines[P153_NR_LINES];
 
 private:
 
-    bool max_length_reached() const; // change
     bool check_full_state_transition();   
     void reset_state_transition();
     void save_to_last_data_table();
     void clear_data_table();
     void get_Data_Label_and_Field(String& user_data, String& user_label);
+    void get_Data_Field_Only(String& user_data, String& user_label);
     String repeat_char(char c, int num);
     void get_flattened_data(String& flattened_data, String* data_list, int num_data_fields);
     void update_checksum(char c);
     void compare_and_reset_checksum(char received_checksum);
+    void reset_state_machine(bool& is_done, uint8_t& nextState, uint8_t currentState);
     
 
     ESPeasySerial *easySerial =                         nullptr;
