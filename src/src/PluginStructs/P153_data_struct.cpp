@@ -1,7 +1,7 @@
 # include "../PluginStructs/P153_data_struct.h"
-
 # include <ESPeasySerial.h>
 
+// DONE
 P153_data_struct::~P153_data_struct() 
 {
     if (easySerial != nullptr) 
@@ -11,6 +11,7 @@ P153_data_struct::~P153_data_struct()
     }
 }
 
+// DONE
 void P153_data_struct::reset() 
 {
     if (easySerial != nullptr) {
@@ -19,6 +20,7 @@ void P153_data_struct::reset()
     }
 }
 
+// DONE
 bool P153_data_struct::init(ESPEasySerialPort port, const int16_t serial_rx, const int16_t serial_tx, unsigned long baudrate,
                             uint8_t config) 
 {
@@ -41,11 +43,13 @@ bool P153_data_struct::init(ESPEasySerialPort port, const int16_t serial_rx, con
     return false;
 }
 
+// DONE
 bool P153_data_struct::isInitialized() const 
 {
     return easySerial != nullptr;
 }
 
+// DONE
 void P153_data_struct::sendString(const String& data) 
 {
     if (isInitialized() && (!data.isEmpty())) 
@@ -62,6 +66,7 @@ void P153_data_struct::sendString(const String& data)
     }
 }
 
+// DONE
 void P153_data_struct::sendData(uint8_t *data, size_t size) 
 {
     if (isInitialized() && size) 
@@ -79,132 +84,62 @@ void P153_data_struct::sendData(uint8_t *data, size_t size)
     }
 }
 
+// DONE
 bool P153_data_struct::loop() 
 {
-    bool data_success = false;
     if (!isInitialized()) 
     {
         return false;
     }
+
     bool fullDataReceived = false;
 
     if (easySerial != nullptr) 
     {
-        int available = easySerial->available();
+        //int available = easySerial->available();
 
-        while (available > 0 && !fullDataReceived) 
+        while (easySerial->available() > 0 && !fullDataReceived) 
         {
             char c = easySerial->read();
-            --available;
+            input_string += c;
+            //--available;
 
-            if (available == 0) 
+            //if (available == 0) 
+            //{
+            //    available = easySerial->available();
+            //    delay(0);
+            //}
+
+            if(c == '\n')
             {
-                available = easySerial->available();
-                delay(0);
+                ++field_count;
+            }
+
+            if(input_string.length() > P153_MAX_STRING_LENGTH)
+            {
+                last_field_count += 1000;
+                ++error_count;
+                field_count = 0;
+                nextState = P153_STATE_READ;
+                save_input_string();
+                input_string = "";
             }
 
             switch (currentState) 
             {
-                case P153_STATE_IDLE:
+                case P153_STATE_READ:
                 {
-                    // Check if full state transition done
-                    // // true: increment FieldCount
-                    if (check_full_state_transition())
+                    if(input_string.indexOf("Checksum\t")>0)
                     {
-                        ++field_count;
-                    }
-                    
-                    // clear state transition array and set [0] <- IDLE
-                    reset_state_transition();
-
-                    // if c = '\n'
-                    // // next state <- LABEL
-                    // // state transition array [1] <- LABEL
-                    // else 
-                    // // next state <- IDLE
-                    if (c == '\n')
-                    {
-                        nextState = P153_STATE_LABEL;
-                        state_transitions[1] = P153_STATE_LABEL;
-                    }
-                    else
-                    {
-                        reset_state_machine(fullDataReceived, nextState, currentState);
+                        nextState =  P153_STATE_LAST_READ; 
                     }
                     break;
                 }
-                case P153_STATE_LABEL:
+
+                case P153_STATE_LAST_READ:
                 {
-                    // if c = '\t'
-                    // // next state <- FIELD
-                    // // state transition array [2] <- FIELD
-                    // else
-                    // // update label at field_count 
-                    if(c == '\t')
-                    {
-                        nextState = P153_STATE_FIELD;
-                        state_transitions[2] = P153_STATE_FIELD;
-                    }
-                    else if((c == '\r') || (c == '\n'))
-                    {
-                        reset_state_machine(fullDataReceived, nextState, currentState);
-                    }
-                    else
-                    {
-                        data_table[field_count][P153_LABEL_IDX] += c;
-                    }
-
-                    // Make sure string doesn't exceed maximum length
-                    if ( (data_table[field_count][P153_LABEL_IDX]).length() >= P153_MAX_LABEL_LENGTH )
-                    {
-                        nextState = P153_STATE_FIELD;
-                        state_transitions[2] = P153_STATE_FIELD;
-                    }
-                    
-                    break;
-                }
-                case P153_STATE_FIELD:
-                {
-                    // dont forget to update data_received_error, fullDataReceived
-
-                    // if c = '\r'
-                    // // next state <- IDLE
-                    // else
-                    // // update field at field_count 
-                    if (c == '\r')
-                    {
-                        nextState = P153_STATE_IDLE;
-                        state_transitions[3] = P153_STATE_IDLE;
-                    }
-                    else if((c == '\t') || (c == '\n'))
-                    {
-                        reset_state_machine(fullDataReceived, nextState, currentState);
-                    }
-                    else
-                    {
-                        data_table[field_count][P153_FIELD_IDX] += c;
-                    }         
-                    // Make sure string doesn't exceed maximum length
-                    if ( (data_table[field_count][P153_FIELD_IDX]).length() >= P153_MAX_FIELD_LENGTH )
-                    {
-                        nextState = P153_STATE_IDLE;
-                        state_transitions[3] = P153_STATE_IDLE;
-                    }
-
-                    // if field count = 47 or data_table[N_FIELDS-1, 0] = "Checksum"
-                    // // fullDatareceuved <-true
-                    // // add the last character which is the checksum
-                    // // save the data table to last table
-                    // // reset field count, clear, data table, reset state transition array and set [0] <- IDLE
-                    uint8_t final_index = P153_NR_FIELDS-1;
-                    if ( (field_count >= final_index) || (data_table[final_index][P153_LABEL_IDX] == "HSDS") )
-                    {
-                        fullDataReceived = true;
-                        length_last_received = field_count;
-                        field_count = 0;
-                        reset_state_transition();
-                    }
-                
+                    fullDataReceived = true;
+                    nextState =  P153_STATE_READ; 
                     break;
                 }
 
@@ -215,68 +150,56 @@ bool P153_data_struct::loop()
                 }
             } // end case
 
-            // filter out nonsense
-            if(c == ':')
-            {
-                //reset_state_machine(fullDataReceived, nextState, currentState);
-            }
-
             currentState = nextState;
         } // end while(available > 0 && !fullSentenceReceived)
     } // end if (easySerial != nullptr) 
 
     if (fullDataReceived) 
     {
-        ++full_data_received;
-
-        save_to_last_data_table();
-        clear_data_table();
-
-        data_success = fullDataReceived;
-        fullDataReceived = false;
-
-        // find checksum
-        char received_checksum = ' ';
-        for(int i=0; i<P153_NR_FIELDS; ++i)
-        {
-            if(last_data_table[i][P153_LABEL_IDX] == "Checksum")
-            {
-                received_checksum = (last_data_table[i][P153_FIELD_IDX]).charAt(0);
-            }
-        }
-
-        compare_and_reset_checksum( received_checksum );
+        success_count += 1;
+        save_input_string();
+        input_string = "";
+        last_field_count = field_count;
+        field_count = 0;
+        check_checksum();
     }
 
-    return false;//data_success;
+    return false;//fullDataReceived;
 }
 
+// DONE-ish
 void P153_data_struct::reset_state_machine(bool& is_done, uint8_t& nextState, uint8_t currentState)
 {
-    nextState = P153_STATE_IDLE;
-    currentState = P153_STATE_IDLE;
-    last_checksum = 0;
+    nextState = P153_STATE_READ;
+    currentState = P153_STATE_READ;
+    input_string = "";
+    //checksum = 0;
     field_count = 0;
-    clear_data_table();
-    reset_state_transition();
     is_done = false;
-    full_data_received_error += 1;
+    //full_data_received_error += 1;
 }
 
+// DONE
+void P153_data_struct::save_input_string()
+{
+    sentence = input_string.substring(0, input_string.length());
+}
+
+// DONE
 bool P153_data_struct::getSentence(String& string) 
 {
     int nr_data_labels = get_Nr_User_Labels();
-    String user_data[nr_data_labels]; // POTENTIAL ERROR
+    String user_data[nr_data_labels];
+    String user_data_success = String();
 
     for(int i = 0; i<nr_data_labels; ++i)
     {
         String label = get_User_Label(i);
-        //get_Data_Label_and_Field(user_data[i], label);
-        get_Data_Field_Only(user_data[i], label);
+        user_data_success += String( search_field_value(sentence, label, user_data[i]) );
     }
 
     get_flattened_data(string, user_data, nr_data_labels);
-    string += String(nr_data_labels) + "," + String(full_data_received_error);
+    string += String(nr_data_labels) + "," + user_data_success;
 
     if (string.isEmpty()) 
     {
@@ -286,11 +209,34 @@ bool P153_data_struct::getSentence(String& string)
     return true;
 }
 
+// DONE
+bool P153_data_struct::search_field_value(String& str, String& Label, String& field_value)
+{
+    field_value = "";
+
+    String appended_field_label = String('\n')+Label+String('\t');
+
+    int idx = str.indexOf(appended_field_label);
+
+    if(idx < 0)
+    {
+        field_value = String('0');
+        return false;
+    }
+
+    int start_idx = idx + appended_field_label.length();
+    int end_idx = str.indexOf('\r', start_idx);
+
+    field_value = str.substring(start_idx, end_idx);
+
+    return true;
+}
+
 void P153_data_struct::getSentencesReceived(uint32_t& succes, uint32_t& error, uint32_t& length_last) const 
 {
-    succes      = full_data_received;
-    error       = full_data_received_error;
-    length_last = length_last_received;
+    succes      = success_count;
+    error       = error_count;
+    length_last = last_field_count;
 }
 
 void P153_data_struct::setMaxLength(uint16_t maxlenght) 
@@ -298,6 +244,7 @@ void P153_data_struct::setMaxLength(uint16_t maxlenght)
     max_length = maxlenght;
 }
 
+// DONE
 // EISH: not sure about this
 void P153_data_struct::setLine(uint8_t varNr, const String& line) 
 {
@@ -307,6 +254,7 @@ void P153_data_struct::setLine(uint8_t varNr, const String& line)
     }
 }
 
+// DONE
 String P153_data_struct::get_User_Label(int idx)
 {
         int real_idx = P153_FIRST_USER_LABEL_POS + idx;
@@ -319,118 +267,22 @@ String P153_data_struct::get_User_Label(int idx)
             return "";
         }
 }
+
+// DONE-ish
 int P153_data_struct::get_Nr_User_LabelForms_Filled()
 {
     // Not sure if i'll be successful with this function
     return 1;
 }
 
+// DONE
 int P153_data_struct::get_Nr_User_Labels()
 {
     return (_lines[P153_NR_USER_LABELS_POS]).toInt();
     //return 4;
 }
 
-bool P153_data_struct::check_full_state_transition()
-{
-  return (state_transitions[0] == P153_STATE_IDLE) && (state_transitions[1] == P153_STATE_LABEL) && (state_transitions[2] == P153_STATE_FIELD) && (state_transitions[3] == P153_STATE_IDLE);
-}
-
-void P153_data_struct::reset_state_transition()
-{
-  state_transitions[0] = P153_STATE_IDLE;
-  state_transitions[1] = 0;
-  state_transitions[2] = 0;
-  state_transitions[3] = 0;  
-}
-
-void P153_data_struct::save_to_last_data_table()
-{
-  for(int row = 0; row < P153_NR_FIELDS; ++row)
-  {
-    last_data_table[row][P153_LABEL_IDX] = (data_table[row][P153_LABEL_IDX]).substring(0, (data_table[row][P153_LABEL_IDX]).length());
-    last_data_table[row][P153_FIELD_IDX] = (data_table[row][P153_FIELD_IDX]).substring(0, (data_table[row][P153_FIELD_IDX]).length());
-  }
-}
-
-void P153_data_struct::clear_data_table()
-{
-  for(int row = 0; row < P153_NR_FIELDS; ++row)
-  {
-    data_table[row][P153_LABEL_IDX] = "";
-    data_table[row][P153_FIELD_IDX] = "";
-  }
-}
-
-void P153_data_struct::get_Data_Label_and_Field(String& user_data, String& user_label)
-{
-    // if user label is empty
-    // // set user_data <- space
-    if(user_label == "")
-    {
-        user_data = String('?');
-        return;
-    }
-    int golden_row = -1;
-    int num_empty_space = 0;
-
-    num_empty_space =  P153_MAX_LABEL_LENGTH - user_label.length();
-    user_data = user_label + repeat_char(' ',num_empty_space-1) + ":";
-
-    for (int row = 0; row < P153_NR_FIELDS; row++) 
-    {
-        if (last_data_table[row][P153_LABEL_IDX] == user_label) 
-        {
-            golden_row = row;
-            break;
-        }
-    }
-
-    if(golden_row != -1)
-    {
-        num_empty_space =  P153_MAX_FIELD_LENGTH - (last_data_table[golden_row][P153_FIELD_IDX]).length();
-        user_data += last_data_table[golden_row][P153_FIELD_IDX] + repeat_char(' ',num_empty_space);
-    }
-    else
-    {
-        user_data += "UNKNOWN   ";
-    }
-  
-}
-
-void P153_data_struct::get_Data_Field_Only(String& user_data, String& user_label)
-{
-    user_data = "";
-    // if user label is empty
-    // // set user_data <- space
-    if(user_label == "")
-    {
-        user_data = String('?');
-        return;
-    }
-    int golden_row = -1;
-    int num_empty_space = 0;
-
-    for (int row = 0; row < P153_NR_FIELDS; row++) 
-    {
-        if (last_data_table[row][P153_LABEL_IDX] == user_label) 
-        {
-            golden_row = row;
-            break;
-        }
-    }
-
-    if(golden_row != -1)
-    {
-        user_data += last_data_table[golden_row][P153_FIELD_IDX] + String(',');
-    }
-    else
-    {
-        user_data += "0,";
-    }
-  
-}
-
+// DONE
 String P153_data_struct::repeat_char(char c, int num)
 {
     if(num <= 1)
@@ -445,33 +297,42 @@ String P153_data_struct::repeat_char(char c, int num)
     return result;
 }
 
+// DONE
 void P153_data_struct::get_flattened_data(String& flattened_data, String* data_list, int num_data_fields)
 {
     flattened_data = "";
     for(int i=0; i<num_data_fields; ++i)
     {
-        if( data_list[i] != String('?'));
-        {
-            flattened_data += data_list[i];
-        }
+        flattened_data += data_list[i] + String(',');
     }
 }
 
-void P153_data_struct::update_checksum(char c)
+// DONE
+void P153_data_struct::check_checksum()
 {
-  if (c != '\0')
-  {
-    last_checksum = (last_checksum + (uint8_t)c);  
-  }
+    int i = sentence.indexOf("\r\n",0);
+    while(i<sentence.length()-1)
+    {
+        char c = sentence[i];
+        checksum = (checksum + (uint8_t)c);  
+        i += 1;
+    }
+
+    char received_checksum = sentence.charAt(sentence.length()-1);
+
+    compare_and_reset_checksum(received_checksum);
 }
 
+
+// DONE
 void P153_data_struct::compare_and_reset_checksum(char received_checksum)
 {
-  uint8_t checksum = last_checksum-(uint8_t)received_checksum;
-  checksum = 256 - checksum;
-  if (  ((char)checksum) != received_checksum)
+  uint8_t cs = checksum;
+  cs = 256 - cs;
+  if (  ((char)cs) != received_checksum)
   {
-    full_data_received_error = full_data_received_error + 1;
+    error_count += 1;
   }
-  last_checksum = 0;
+  checksum = 0;
 }
+

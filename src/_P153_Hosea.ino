@@ -122,7 +122,7 @@ boolean Plugin_153(uint8_t function, struct EventStruct *event, String& string)
 
 		case PLUGIN_WEBFORM_LOAD:
 		{
-			addFormSubHeader(F("MPPT LABELS SELECT")); 
+			addFormSubHeader(F("Select MPPT Fields to Read")); 
 			P153_html_show_user_label_forms(event);
 
 			addFormSubHeader(F("Statistics")); // TODO: in plugin data struct, change html code

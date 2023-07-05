@@ -11,13 +11,12 @@
 // For Webforms
 # define P153_NR_FORM_chars         10 // used for num chars in textbox
 // For State Machine
-# define P153_STATE_IDLE            1
-# define P153_STATE_LABEL           2
-# define P153_STATE_FIELD           3
+# define P153_STATE_READ            1
+# define P153_STATE_LAST_READ       2
 # define P153_MAX_LABEL_LENGTH      130
 # define P153_MAX_FIELD_LENGTH      130
-# define P153_NR_STATE_TRANS        4
-# define P153_NR_FIELDS             20 //MUST CHANGE
+# define P153_MAX_STRING_LENGTH     1000
+# define P153_NR_FIELDS             20 // 48 FOR BMV
 # define P153_LABEL_IDX             0
 # define P153_FIELD_IDX             1
 
@@ -75,30 +74,24 @@ public:
 
 private:
 
-    bool check_full_state_transition();   
-    void reset_state_transition();
-    void save_to_last_data_table();
-    void clear_data_table();
-    void get_Data_Label_and_Field(String& user_data, String& user_label);
-    void get_Data_Field_Only(String& user_data, String& user_label);
+    void save_input_string();
+    bool search_field_value(String& str, String& Label, String& field_value);
     String repeat_char(char c, int num);
     void get_flattened_data(String& flattened_data, String* data_list, int num_data_fields);
-    void update_checksum(char c);
+    void check_checksum();
     void compare_and_reset_checksum(char received_checksum);
     void reset_state_machine(bool& is_done, uint8_t& nextState, uint8_t currentState);
     
 
     ESPeasySerial *easySerial =                         nullptr;
-    String         data_table[P153_NR_FIELDS][2] =      {{""}};
-    String         last_data_table[P153_NR_FIELDS][2] = {{""}};
-    String         last_sentence =                      {""}; // might not need 
-    uint16_t       max_length =                         {20}; //Change
+    String         input_string =                       {""};
+    String         sentence =                           {""};  
+    uint16_t       max_length =                         {P153_MAX_STRING_LENGTH}; // Change
     uint8_t        field_count =                        {0};
-    uint32_t       full_data_received =                 {0};
-    uint32_t       full_data_received_error =           {0};
-    uint32_t       length_last_received =               {0}; //change
-    uint8_t        currentState =                       P153_STATE_IDLE;
-    uint8_t        nextState =                          P153_STATE_IDLE;
-    uint8_t        state_transitions[P153_NR_STATE_TRANS] = {0}; 
-    uint8_t        last_checksum =                      {0};
+    uint32_t       success_count =           {0};
+    uint32_t       error_count =     {0};
+    uint32_t       last_field_count =               {0}; //change
+    uint8_t        currentState =                       P153_STATE_READ;
+    uint8_t        nextState =                          P153_STATE_READ;
+    uint8_t        checksum =                           {0};
 };
