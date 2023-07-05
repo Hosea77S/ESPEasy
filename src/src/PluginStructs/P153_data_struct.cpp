@@ -164,7 +164,7 @@ bool P153_data_struct::loop()
         check_checksum();
     }
 
-    return false;//fullDataReceived;
+    return fullDataReceived;
 }
 
 // DONE-ish
