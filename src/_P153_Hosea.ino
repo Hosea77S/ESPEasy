@@ -216,6 +216,11 @@ boolean Plugin_153(uint8_t function, struct EventStruct *event, String& string)
 					delay(0); // Processing a full sentence may take a while, run some
 							// background tasks.
 				}
+				else
+				{
+					//event->String2 += "555";
+				}
+				
 				success = true;
 			}
 
@@ -307,8 +312,10 @@ void P153_html_show_stats(struct EventStruct *event)
 	{
 		addRowLabel(F("Current Sentence"));
 		String sentencePart;
-		P153_data->getSentence(sentencePart);
-		addHtml(sentencePart);
+		if(P153_data->getSentence(sentencePart))
+		{
+			addHtml(sentencePart);
+		}
 	}
 
 	{

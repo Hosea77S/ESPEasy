@@ -15,7 +15,7 @@
 # define P153_STATE_LAST_READ       2
 # define P153_MAX_LABEL_LENGTH      130
 # define P153_MAX_FIELD_LENGTH      130
-# define P153_MAX_STRING_LENGTH     1000
+# define P153_MAX_STRING_LENGTH     2000
 # define P153_NR_FIELDS             20 // 48 FOR BMV
 # define P153_LABEL_IDX             0
 # define P153_FIELD_IDX             1
@@ -51,9 +51,9 @@ public:
     // @retval true when the string is not empty.
     bool getSentence(String& string);
 
-    void getSentencesReceived(  uint32_t& succes,
+    void getSentencesReceived(  uint32_t& success,
                                 uint32_t& error,
-                                uint32_t& length_last) const;//change
+                                uint32_t& length_last);// const;//change
 
     void setMaxLength(uint16_t maxlenght); 
 
@@ -83,15 +83,15 @@ private:
     void reset_state_machine(bool& is_done, uint8_t& nextState, uint8_t currentState);
     
 
-    ESPeasySerial *easySerial =                         nullptr;
-    String         input_string =                       {""};
-    String         sentence =                           {""};  
-    uint16_t       max_length =                         {P153_MAX_STRING_LENGTH}; // Change
-    uint8_t        field_count =                        {0};
-    uint32_t       success_count =           {0};
-    uint32_t       error_count =     {0};
-    uint32_t       last_field_count =               {0}; //change
-    uint8_t        currentState =                       P153_STATE_READ;
-    uint8_t        nextState =                          P153_STATE_READ;
-    uint8_t        checksum =                           {0};
+    ESPeasySerial *easySerial       = nullptr;
+    String         input_string     = "";
+    String         sentence         = "";  
+    uint16_t       max_length       = P153_MAX_STRING_LENGTH; 
+    uint8_t        field_count      = 0;
+    uint32_t       success_count    = 0;
+    uint32_t       error_count      = 0;
+    uint32_t       last_field_count = 0; //change
+    uint8_t        currentState     = P153_STATE_READ;
+    uint8_t        nextState        = P153_STATE_READ;
+    uint8_t        checksum         = 0;
 };

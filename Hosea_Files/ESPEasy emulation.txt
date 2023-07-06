@@ -1,0 +1,742 @@
+# include "P153_data_struct.h"
+# include <HardwareSerial.h>
+
+# define P153_BAUDRATE 19200
+# define LOG_BAUDRATE 115200
+
+unsigned long previousMillis = 0;  // will store last time LED was updated
+const long interval = 60000;  // interval at which to blink (milliseconds)
+String output = "";
+
+HardwareSerial port(1);
+const int16_t serial_rx = 19;
+const int16_t serial_tx = 18;
+
+uint32_t success = 0;
+uint32_t error = 0;
+uint32_t length_last = 0;
+
+void setup() {
+  Serial.begin(LOG_BAUDRATE);
+  previousMillis = millis();
+  unsigned long currentMillis = millis();
+  P153_data_struct* P153_data = new P153_data_struct();
+
+  if(P153_data->init(&port, serial_rx, serial_tx, P153_BAUDRATE))
+  {
+    Serial.println("----------Plugin created-----------");
+    P153_data->setLine(6, "V");
+    P153_data->setLine(7, "I");
+    P153_data->setLine(8, "PPV");
+    P153_data->setLine(9, "Checksum");
+    P153_data->setLine(0, "4");
+  }
+
+  while (millis() - previousMillis < interval)
+  {
+    if(P153_data->loop())
+    {
+      if(P153_data->getSentence(output))
+      {
+        P153_data->getSentencesReceived(success, error, length_last);
+        Serial.println(output);
+        Serial.println("Success\t=\t"+String(success));
+        Serial.println("Error\t=\t"+String(error));
+        Serial.println("LengthLast\t=\t"+String(length_last));
+      }
+    }
+    delay(20);
+  }
+
+}
+
+void loop() {
+
+
+}
+
+# include <HardwareSerial.h>
+
+// For Custom Task settings
+# define P153_NR_USER_LABELS_POS    0
+# define P153_FIRST_USER_LABEL_POS  6
+# define P153_MAX_NR_USER_LABELS    4
+# define P153_NR_LINES              (P153_FIRST_USER_LABEL_POS + P153_MAX_NR_USER_LABELS)
+// For Webforms
+# define P153_NR_FORM_chars         10 // used for num chars in textbox
+// For State Machine
+# define P153_STATE_READ            1
+# define P153_STATE_LAST_READ       2
+# define P153_MAX_LABEL_LENGTH      130
+# define P153_MAX_FIELD_LENGTH      130
+# define P153_MAX_STRING_LENGTH     2000
+# define P153_NR_FIELDS             20 // 48 FOR BMV
+# define P153_LABEL_IDX             0
+# define P153_FIELD_IDX             1
+
+struct P153_data_struct //: public PluginTaskData_base 
+{
+public:
+    P153_data_struct() = default;
+
+    virtual ~P153_data_struct();
+
+    void reset();
+
+    bool init(  HardwareSerial   *port,
+                const int16_t   serial_rx,
+                const int16_t   serial_tx,
+                unsigned long   baudrate);
+
+    // Called after loading the config from the settings.
+    // Will interpret some data and load caches.
+
+    bool isInitialized() const;
+
+    void sendString(const String& data);
+
+    bool loop();
+
+    // Get the received sentence
+    // @retval true when the string is not empty.
+    bool getSentence(String& string);
+
+    void getSentencesReceived(  uint32_t& success,
+                                uint32_t& error,
+                                uint32_t& length_last);// const;
+
+    void setMaxLength(uint16_t maxlenght); 
+
+    // EISH: 
+    void setLine(uint8_t varNr,
+                const String& line);
+
+    // get label stored in custom configs
+    String get_User_Label(int idx);
+
+    int get_Nr_User_Labels();
+
+    int get_Nr_User_LabelForms_Filled();
+
+    // EISH:
+    // Made public so we don't have to copy the values when loading/saving.
+    String _lines[P153_NR_LINES];
+
+private:
+
+    void save_input_string();
+    bool search_field_value(String& str, String& Label, String& field_value);
+    String repeat_char(char c, int num);
+    void get_flattened_data(String& flattened_data, String* data_list, int num_data_fields);
+    void check_checksum();
+    void compare_and_reset_checksum(char received_checksum);
+    void reset_state_machine(bool& is_done, uint8_t& nextState, uint8_t currentState);
+    
+
+    HardwareSerial *easySerial      = nullptr;
+    String         input_string     = "";
+    String         sentence         = "";  
+    uint16_t       max_length       = P153_MAX_STRING_LENGTH; // Change
+    uint8_t        field_count      = 0;
+    uint32_t       success_count    = 0;
+    uint32_t       error_count      = 0;
+    uint32_t       last_field_count = 0; //change
+    uint8_t        currentState     = P153_STATE_READ;
+    uint8_t        nextState        = P153_STATE_READ;
+    uint8_t        checksum         = 0;
+};
+
+# include "P153_data_struct.h"
+# include <HardwareSerial.h>
+
+// DONE
+P153_data_struct::~P153_data_struct() 
+{
+    if (easySerial != nullptr) 
+    {
+        delete easySerial;
+        easySerial = nullptr;
+    }
+}
+
+// DONE
+void P153_data_struct::reset() 
+{
+    if (easySerial != nullptr) {
+        delete easySerial;
+        easySerial = nullptr;
+    }
+}
+
+// DONE
+bool P153_data_struct::init(HardwareSerial *port, const int16_t serial_rx, const int16_t serial_tx, unsigned long baudrate) 
+{
+    if ((serial_rx < 0) && (serial_tx < 0)) 
+    {
+        return false;
+    }
+    reset();
+    easySerial = port;
+
+    if (isInitialized()) 
+    {
+        easySerial->begin(baudrate, SERIAL_8N1,  serial_rx, serial_tx);
+        return true;
+    }
+    return false;
+}
+
+// DONE
+bool P153_data_struct::isInitialized() const 
+{
+    return easySerial != nullptr;
+}
+
+// DONE
+void P153_data_struct::sendString(const String& data) 
+{
+    if (isInitialized() && !(data.length()==0)) 
+    {
+        // setDisableFilterWindowTimer();
+        easySerial->print(data);
+    }
+}
+
+// DONE
+bool P153_data_struct::loop() 
+{
+    if (!isInitialized()) 
+    {
+        return false;
+    }
+
+    bool fullDataReceived = false;
+
+    if (easySerial != nullptr) 
+    {
+        //int available = easySerial->available();
+
+        while (easySerial->available() > 0 && !fullDataReceived)
+        {
+            char c = easySerial->read();
+            input_string += c;
+            //--available;
+
+            //if (available == 0) 
+            //{
+            //    available = easySerial->available();
+            //    delay(0);
+            //}
+
+            if(c == '\n')
+            {
+                field_count += 1;
+            }
+
+            if(input_string.length() > P153_MAX_STRING_LENGTH)
+            {
+                last_field_count += field_count;
+                error_count += 1;
+                field_count = 0;
+                nextState = P153_STATE_READ;
+                save_input_string();
+                input_string = "";
+                break;
+            }
+
+            switch (currentState) 
+            {
+                case P153_STATE_READ:
+                {
+                    if(input_string.indexOf("Checksum\t")>0)
+                    {
+                        nextState =  P153_STATE_LAST_READ; 
+                    }
+                    break;
+                }
+
+                case P153_STATE_LAST_READ:
+                {
+                    fullDataReceived = true;
+                    nextState =  P153_STATE_READ; 
+                    break;
+                }
+
+                default:
+                {
+                    reset_state_machine(fullDataReceived, nextState, currentState);
+                    break;
+                }
+            } // end case
+
+            currentState = nextState;
+        } // end while(available > 0 && !fullSentenceReceived)
+    } // end if (easySerial != nullptr) 
+
+    if (fullDataReceived) 
+    {
+        success_count += 1;
+        save_input_string();
+        input_string = "";
+        last_field_count = field_count;
+        field_count = 0;
+        check_checksum();
+    }
+
+    return fullDataReceived;
+}
+
+// DONE-ish-
+void P153_data_struct::reset_state_machine(bool& is_done, uint8_t& nextState, uint8_t currentState)
+{
+    nextState = P153_STATE_READ;
+    currentState = P153_STATE_READ;
+    input_string = "";
+    field_count = 0;
+    is_done = false;
+}
+
+// DONE-
+void P153_data_struct::save_input_string()
+{
+    sentence = input_string.substring(0, input_string.length());
+}
+
+// DONE-
+bool P153_data_struct::getSentence(String& string) 
+{
+    int nr_data_labels = get_Nr_User_Labels();
+    String user_data[nr_data_labels];
+    String user_data_success = String();
+
+    for(int i = 0; i<nr_data_labels; ++i)
+    {
+        String label = get_User_Label(i);
+        user_data_success += String( search_field_value(sentence, label, user_data[i]) );
+    }
+
+    get_flattened_data(string, user_data, nr_data_labels);
+    string += String(nr_data_labels) + "," + user_data_success;
+
+    if (string.length()==0) 
+    {
+        return false;
+    }
+
+    return true;
+}
+
+// DONE-
+bool P153_data_struct::search_field_value(String& str, String& Label, String& field_value)
+{
+    field_value = "";
+
+    String appended_field_label = String('\n')+Label+String('\t');
+
+    int idx = str.indexOf(appended_field_label);
+
+    if(idx < 0)
+    {
+        field_value = String('0');
+        return false;
+    }
+
+    int start_idx = idx + appended_field_label.length();
+    int end_idx = str.indexOf('\r', start_idx);
+
+    field_value = str.substring(start_idx, end_idx);
+
+    return true;
+}
+
+// DONE-
+void P153_data_struct::getSentencesReceived(uint32_t& success, uint32_t& error, uint32_t& length_last) //const 
+{
+    success      = success_count;
+    error       = error_count;
+    length_last = last_field_count;
+}
+
+// DONE-
+void P153_data_struct::setMaxLength(uint16_t maxlenght) 
+{
+    max_length = maxlenght;
+}
+
+// DONE-
+// EISH: not sure about this
+void P153_data_struct::setLine(uint8_t varNr, const String& line) 
+{
+    if (varNr < P153_NR_LINES) 
+    {
+        _lines[varNr] = line;
+    }
+}
+
+// DONE-
+String P153_data_struct::get_User_Label(int idx)
+{
+        int real_idx = P153_FIRST_USER_LABEL_POS + idx;
+        if(real_idx < P153_NR_LINES)
+        {
+            return _lines[real_idx];
+        }
+        else
+        {
+            return "";
+        }
+}
+
+// DONE-ish-
+int P153_data_struct::get_Nr_User_LabelForms_Filled()
+{
+    // Not sure if i'll be successful with this function
+    return 1;
+}
+
+// DONE-
+int P153_data_struct::get_Nr_User_Labels()
+{
+    return (_lines[P153_NR_USER_LABELS_POS]).toInt();
+    //return 4;
+}
+
+// DONE-
+String P153_data_struct::repeat_char(char c, int num)
+{
+    if(num <= 1)
+    {
+        return "";
+    }
+    String result = String();
+    for(int i=0; i<num; ++i)
+    {
+        result += c;
+    }
+    return result;
+}
+
+// DONE-
+void P153_data_struct::get_flattened_data(String& flattened_data, String* data_list, int num_data_fields)
+{
+    flattened_data = "";
+    for(int i=0; i<num_data_fields; ++i)
+    {
+        flattened_data += data_list[i] + String(',');
+    }
+}
+
+// DONE-
+void P153_data_struct::check_checksum()
+{
+    int i = sentence.indexOf("\r\n",0);
+    while(i<sentence.length()-1)
+    {
+        char c = sentence[i];
+        checksum = (checksum + (uint8_t)c);  
+        i += 1;
+    }
+
+    char received_checksum = sentence.charAt(sentence.length()-1);
+
+    compare_and_reset_checksum(received_checksum);
+}
+
+
+// DONE-
+void P153_data_struct::compare_and_reset_checksum(char received_checksum)
+{
+  uint8_t cs = checksum;
+  cs = 256 - cs;
+  if (  ((char)cs) != received_checksum)
+  {
+    error_count += 1;
+  }
+  checksum = 0;
+}
+
+
+11:08:20.608 -> 13290,-240,0,⸮,4,1111
+11:08:20.608 -> Success	=	18
+11:08:20.608 -> Error	=	1
+11:08:20.608 -> LengthLast	=	20
+11:08:21.586 -> 13290,-180,0,⸮,4,1111
+11:08:21.586 -> Success	=	19
+11:08:21.586 -> Error	=	1
+11:08:21.586 -> LengthLast	=	20
+11:08:22.612 -> 13290,-190,0,⸮,4,1111
+11:08:22.612 -> Success	=	20
+11:08:22.612 -> Error	=	1
+11:08:22.612 -> LengthLast	=	20
+11:08:23.587 -> 13290,-180,0,⸮,4,1111
+11:08:23.587 -> Success	=	21
+11:08:23.587 -> Error	=	1
+11:08:23.587 -> LengthLast	=	20
+11:08:24.609 -> 13290,-210,0,⸮,4,1111
+11:08:24.609 -> Success	=	22
+11:08:24.609 -> Error	=	1
+11:08:24.609 -> LengthLast	=	20
+11:08:25.589 -> 13290,-190,0,⸮,4,1111
+11:08:25.589 -> Success	=	23
+11:08:25.589 -> Error	=	1
+11:08:25.589 -> LengthLast	=	22
+11:08:26.612 -> 13290,-190,0,⸮,4,1111
+11:08:26.612 -> Success	=	24
+11:08:26.612 -> Error	=	1
+11:08:26.612 -> LengthLast	=	20
+11:08:27.591 -> 13290,-200,0,⸮,4,1111
+11:08:27.591 -> Success	=	25
+11:08:27.591 -> Error	=	1
+11:08:27.591 -> LengthLast	=	20
+11:08:27.962 -> ets Jul 29 2019 12:21:46
+11:08:27.962 -> 
+11:08:27.962 -> rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+11:08:27.962 -> configsip: 0, SPIWP:0xee
+11:08:27.962 -> clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+11:08:27.962 -> mode:DIO, clock div:1
+11:08:27.962 -> load:0x3fff0030,len:1184
+11:08:27.962 -> load:0x40078000,len:13220
+11:08:27.962 -> ho 0 tail 12 room 4
+11:08:27.962 -> load:0x40080400,len:3028
+11:08:28.008 -> entry 0x400805e4
+11:08:28.103 -> ----------Plugin created-----------
+11:08:28.614 -> 13290,-210,0,⸮,4,1111
+11:08:28.614 -> Success	=	1
+11:08:28.614 -> Error	=	0
+11:08:28.614 -> LengthLast	=	20
+11:08:29.594 -> 13290,-250,0,⸮,4,1111
+11:08:29.594 -> Success	=	2
+11:08:29.594 -> Error	=	0
+11:08:29.594 -> LengthLast	=	20
+11:08:30.624 -> 13290,-260,0,⸮,4,1111
+11:08:30.624 -> Success	=	3
+11:08:30.624 -> Error	=	0
+11:08:30.624 -> LengthLast	=	20
+11:08:31.600 -> 13290,-240,0,⸮,4,1111
+11:08:31.600 -> Success	=	4
+11:08:31.600 -> Error	=	0
+11:08:31.600 -> LengthLast	=	20
+11:08:32.621 -> 13290,-250,0,⸮,4,1111
+11:08:32.621 -> Success	=	5
+11:08:32.621 -> Error	=	0
+11:08:32.621 -> LengthLast	=	20
+11:08:33.601 -> 13290,-240,0,⸮,4,1111
+11:08:33.601 -> Success	=	6
+11:08:33.601 -> Error	=	0
+11:08:33.601 -> LengthLast	=	20
+11:08:34.623 -> 13290,-240,0,⸮,4,1111
+11:08:34.623 -> Success	=	7
+11:08:34.623 -> Error	=	0
+11:08:34.623 -> LengthLast	=	20
+11:08:35.602 -> 13290,-280,0,⸮,4,1111
+11:08:35.602 -> Success	=	8
+11:08:35.602 -> Error	=	0
+11:08:35.602 -> LengthLast	=	20
+11:08:36.581 -> 13290,-260,0,⸮,4,1111
+11:08:36.628 -> Success	=	9
+11:08:36.628 -> Error	=	0
+11:08:36.628 -> LengthLast	=	20
+11:08:37.605 -> 13290,-280,0,⸮,4,1111
+11:08:37.605 -> Success	=	10
+11:08:37.605 -> Error	=	0
+11:08:37.605 -> LengthLast	=	20
+11:08:38.627 -> 13290,-280,0,⸮,4,1111
+11:08:38.627 -> Success	=	11
+11:08:38.627 -> Error	=	0
+11:08:38.627 -> LengthLast	=	20
+11:08:39.611 -> 13290,-280,0,⸮,4,1111
+11:08:39.611 -> Success	=	12
+11:08:39.611 -> Error	=	0
+11:08:39.611 -> LengthLast	=	20
+11:08:40.636 -> 13290,-280,0,⸮,4,1111
+11:08:40.636 -> Success	=	13
+11:08:40.636 -> Error	=	0
+11:08:40.636 -> LengthLast	=	20
+11:08:41.598 -> 13290,-300,0,⸮,4,1111
+11:08:41.598 -> Success	=	14
+11:08:41.598 -> Error	=	0
+11:08:41.598 -> LengthLast	=	20
+11:08:42.626 -> 13290,-290,0,⸮,4,1111
+11:08:42.626 -> Success	=	15
+11:08:42.626 -> Error	=	0
+11:08:42.626 -> LengthLast	=	20
+11:08:43.605 -> 13290,-260,0,⸮,4,1111
+11:08:43.605 -> Success	=	16
+11:08:43.605 -> Error	=	0
+11:08:43.605 -> LengthLast	=	20
+11:08:44.632 -> 13290,-260,0,⸮,4,1111
+11:08:44.632 -> Success	=	17
+11:08:44.632 -> Error	=	0
+11:08:44.632 -> LengthLast	=	20
+11:08:45.614 -> 13290,-270,0,⸮,4,1111
+11:08:45.614 -> Success	=	18
+11:08:45.614 -> Error	=	0
+11:08:45.614 -> LengthLast	=	20
+11:08:46.595 -> 13290,-230,0,⸮,4,1111
+11:08:46.595 -> Success	=	19
+11:08:46.595 -> Error	=	0
+11:08:46.595 -> LengthLast	=	20
+11:08:47.622 -> 13290,-220,0,⸮,4,1111
+11:08:47.622 -> Success	=	20
+11:08:47.622 -> Error	=	0
+11:08:47.622 -> LengthLast	=	20
+11:08:48.604 -> 13290,-220,0,⸮,4,1111
+11:08:48.604 -> Success	=	21
+11:08:48.604 -> Error	=	0
+11:08:48.604 -> LengthLast	=	20
+11:08:49.631 -> 13290,-220,0,⸮,4,1111
+11:08:49.631 -> Success	=	22
+11:08:49.631 -> Error	=	0
+11:08:49.631 -> LengthLast	=	20
+11:08:50.611 -> 13290,-220,0,⸮,4,1111
+11:08:50.611 -> Success	=	23
+11:08:50.611 -> Error	=	0
+11:08:50.611 -> LengthLast	=	20
+11:08:51.592 -> 13290,-230,0,⸮,4,1111
+11:08:51.592 -> Success	=	24
+11:08:51.592 -> Error	=	0
+11:08:51.592 -> LengthLast	=	20
+11:08:52.621 -> 13290,-220,0,⸮,4,1111
+11:08:52.621 -> Success	=	25
+11:08:52.621 -> Error	=	0
+11:08:52.621 -> LengthLast	=	20
+11:08:53.604 -> 13290,-250,0,⸮,4,1111
+11:08:53.604 -> Success	=	26
+11:08:53.604 -> Error	=	0
+11:08:53.604 -> LengthLast	=	20
+11:08:54.633 -> 13290,-330,0,⸮,4,1111
+11:08:54.633 -> Success	=	27
+11:08:54.633 -> Error	=	0
+11:08:54.633 -> LengthLast	=	20
+11:08:55.617 -> 13290,-300,0,⸮,4,1111
+11:08:55.617 -> Success	=	28
+11:08:55.617 -> Error	=	0
+11:08:55.617 -> LengthLast	=	20
+11:08:56.594 -> 13280,-290,0,⸮,4,1111
+11:08:56.594 -> Success	=	29
+11:08:56.594 -> Error	=	0
+11:08:56.594 -> LengthLast	=	20
+11:08:57.621 -> 13280,-290,0,⸮,4,1111
+11:08:57.621 -> Success	=	30
+11:08:57.621 -> Error	=	0
+11:08:57.621 -> LengthLast	=	20
+11:08:58.604 -> 13270,-290,0,⸮,4,1111
+11:08:58.604 -> Success	=	31
+11:08:58.604 -> Error	=	0
+11:08:58.604 -> LengthLast	=	20
+11:08:59.634 -> 13290,-280,0,⸮,4,1111
+11:08:59.634 -> Success	=	32
+11:08:59.634 -> Error	=	0
+11:08:59.634 -> LengthLast	=	20
+11:09:00.615 -> 13280,-300,0,⸮,4,1111
+11:09:00.615 -> Success	=	33
+11:09:00.615 -> Error	=	0
+11:09:00.615 -> LengthLast	=	20
+11:09:01.597 -> 13290,-280,0,⸮,4,1111
+11:09:01.597 -> Success	=	34
+11:09:01.597 -> Error	=	0
+11:09:01.597 -> LengthLast	=	20
+11:09:02.627 -> 13290,-280,0,⸮,4,1111
+11:09:02.627 -> Success	=	35
+11:09:02.627 -> Error	=	0
+11:09:02.627 -> LengthLast	=	20
+11:09:03.607 -> 13280,-290,0,⸮,4,1111
+11:09:03.607 -> Success	=	36
+11:09:03.607 -> Error	=	0
+11:09:03.607 -> LengthLast	=	20
+11:09:04.635 -> 13290,-280,0,⸮,4,1111
+11:09:04.635 -> Success	=	37
+11:09:04.635 -> Error	=	0
+11:09:04.635 -> LengthLast	=	20
+11:09:05.616 -> 13280,-280,0,⸮,4,1111
+11:09:05.616 -> Success	=	38
+11:09:05.616 -> Error	=	0
+11:09:05.616 -> LengthLast	=	20
+11:09:06.646 -> 13290,-280,0,⸮,4,1111
+11:09:06.646 -> Success	=	39
+11:09:06.646 -> Error	=	0
+11:09:06.646 -> LengthLast	=	20
+11:09:07.630 -> 13280,-280,0,⸮,4,1111
+11:09:07.630 -> Success	=	40
+11:09:07.630 -> Error	=	0
+11:09:07.630 -> LengthLast	=	20
+11:09:08.611 -> 13290,-280,0,⸮,4,1111
+11:09:08.611 -> Success	=	41
+11:09:08.611 -> Error	=	0
+11:09:08.611 -> LengthLast	=	20
+11:09:09.640 -> 13280,-280,0,⸮,4,1111
+11:09:09.640 -> Success	=	42
+11:09:09.640 -> Error	=	0
+11:09:09.640 -> LengthLast	=	20
+11:09:10.625 -> 13290,-280,0,⸮,4,1111
+11:09:10.625 -> Success	=	43
+11:09:10.625 -> Error	=	0
+11:09:10.625 -> LengthLast	=	20
+11:09:11.609 -> 13280,-280,0,⸮,4,1111
+11:09:11.609 -> Success	=	44
+11:09:11.609 -> Error	=	0
+11:09:11.609 -> LengthLast	=	20
+11:09:12.638 -> 13280,-290,0,⸮,4,1111
+11:09:12.638 -> Success	=	45
+11:09:12.638 -> Error	=	0
+11:09:12.638 -> LengthLast	=	20
+11:09:13.623 -> 13290,-260,0,⸮,4,1111
+11:09:13.623 -> Success	=	46
+11:09:13.623 -> Error	=	0
+11:09:13.623 -> LengthLast	=	20
+11:09:14.650 -> 13290,-260,0,⸮,4,1111
+11:09:14.650 -> Success	=	47
+11:09:14.650 -> Error	=	0
+11:09:14.650 -> LengthLast	=	20
+11:09:15.631 -> 13290,-230,0,⸮,4,1111
+11:09:15.631 -> Success	=	48
+11:09:15.631 -> Error	=	0
+11:09:15.631 -> LengthLast	=	20
+11:09:16.660 -> 13290,-220,0,⸮,4,1111
+11:09:16.660 -> Success	=	49
+11:09:16.660 -> Error	=	0
+11:09:16.660 -> LengthLast	=	20
+11:09:17.639 -> 13290,-280,0,⸮,4,1111
+11:09:17.639 -> Success	=	50
+11:09:17.639 -> Error	=	0
+11:09:17.639 -> LengthLast	=	20
+11:09:18.621 -> 13290,-210,0,⸮,4,1111
+11:09:18.621 -> Success	=	51
+11:09:18.621 -> Error	=	0
+11:09:18.621 -> LengthLast	=	20
+11:09:19.649 -> 13290,-210,0,⸮,4,1111
+11:09:19.649 -> Success	=	52
+11:09:19.649 -> Error	=	0
+11:09:19.649 -> LengthLast	=	20
+11:09:20.628 -> 13290,-210,0,⸮,4,1111
+11:09:20.628 -> Success	=	53
+11:09:20.628 -> Error	=	0
+11:09:20.628 -> LengthLast	=	20
+11:09:21.655 -> 13290,-210,0,⸮,4,1111
+11:09:21.655 -> Success	=	54
+11:09:21.655 -> Error	=	0
+11:09:21.655 -> LengthLast	=	20
+11:09:22.636 -> 13290,-230,0,⸮,4,1111
+11:09:22.636 -> Success	=	55
+11:09:22.636 -> Error	=	0
+11:09:22.636 -> LengthLast	=	20
+11:09:23.618 -> 13290,-220,0,⸮,4,1111
+11:09:23.618 -> Success	=	56
+11:09:23.618 -> Error	=	0
+11:09:23.618 -> LengthLast	=	20
+11:09:24.646 -> 13290,-210,0,⸮,4,1111
+11:09:24.646 -> Success	=	57
+11:09:24.646 -> Error	=	0
+11:09:24.646 -> LengthLast	=	20
+11:09:25.627 -> 13290,-210,0,⸮,4,1111
+11:09:25.627 -> Success	=	58
+11:09:25.627 -> Error	=	0
+11:09:25.627 -> LengthLast	=	20
+11:09:26.656 -> 13290,-230,0,⸮,4,1111
+11:09:26.656 -> Success	=	59
+11:09:26.656 -> Error	=	0
+11:09:26.656 -> LengthLast	=	20
+11:09:27.638 -> 13290,-210,0,⸮,4,1111
+11:09:27.638 -> Success	=	60
+11:09:27.638 -> Error	=	0
+11:09:27.638 -> LengthLast	=	20

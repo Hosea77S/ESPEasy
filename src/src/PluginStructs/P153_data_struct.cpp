@@ -1,7 +1,7 @@
 # include "../PluginStructs/P153_data_struct.h"
 # include <ESPeasySerial.h>
 
-// DONE
+// DONE-
 P153_data_struct::~P153_data_struct() 
 {
     if (easySerial != nullptr) 
@@ -11,7 +11,7 @@ P153_data_struct::~P153_data_struct()
     }
 }
 
-// DONE
+// DONE-
 void P153_data_struct::reset() 
 {
     if (easySerial != nullptr) {
@@ -20,7 +20,7 @@ void P153_data_struct::reset()
     }
 }
 
-// DONE
+// DONE-
 bool P153_data_struct::init(ESPEasySerialPort port, const int16_t serial_rx, const int16_t serial_tx, unsigned long baudrate,
                             uint8_t config) 
 {
@@ -43,13 +43,13 @@ bool P153_data_struct::init(ESPEasySerialPort port, const int16_t serial_rx, con
     return false;
 }
 
-// DONE
+// DONE-
 bool P153_data_struct::isInitialized() const 
 {
     return easySerial != nullptr;
 }
 
-// DONE
+// DONE-
 void P153_data_struct::sendString(const String& data) 
 {
     if (isInitialized() && (!data.isEmpty())) 
@@ -66,7 +66,7 @@ void P153_data_struct::sendString(const String& data)
     }
 }
 
-// DONE
+// DONE-
 void P153_data_struct::sendData(uint8_t *data, size_t size) 
 {
     if (isInitialized() && size) 
@@ -84,7 +84,7 @@ void P153_data_struct::sendData(uint8_t *data, size_t size)
     }
 }
 
-// DONE
+// DONE-
 bool P153_data_struct::loop() 
 {
     if (!isInitialized()) 
@@ -112,17 +112,18 @@ bool P153_data_struct::loop()
 
             if(c == '\n')
             {
-                ++field_count;
+                field_count += 1;
             }
 
             if(input_string.length() > P153_MAX_STRING_LENGTH)
             {
-                last_field_count += 1000;
-                ++error_count;
+                last_field_count += field_count;
+                error_count += 1;
                 field_count = 0;
                 nextState = P153_STATE_READ;
                 save_input_string();
                 input_string = "";
+                break;
             }
 
             switch (currentState) 
@@ -167,25 +168,23 @@ bool P153_data_struct::loop()
     return fullDataReceived;
 }
 
-// DONE-ish
+// DONE-ish-
 void P153_data_struct::reset_state_machine(bool& is_done, uint8_t& nextState, uint8_t currentState)
 {
     nextState = P153_STATE_READ;
     currentState = P153_STATE_READ;
     input_string = "";
-    //checksum = 0;
     field_count = 0;
     is_done = false;
-    //full_data_received_error += 1;
 }
 
-// DONE
+// DONE-
 void P153_data_struct::save_input_string()
 {
     sentence = input_string.substring(0, input_string.length());
 }
 
-// DONE
+// DONE-
 bool P153_data_struct::getSentence(String& string) 
 {
     int nr_data_labels = get_Nr_User_Labels();
@@ -209,7 +208,7 @@ bool P153_data_struct::getSentence(String& string)
     return true;
 }
 
-// DONE
+// DONE-
 bool P153_data_struct::search_field_value(String& str, String& Label, String& field_value)
 {
     field_value = "";
@@ -232,19 +231,21 @@ bool P153_data_struct::search_field_value(String& str, String& Label, String& fi
     return true;
 }
 
-void P153_data_struct::getSentencesReceived(uint32_t& succes, uint32_t& error, uint32_t& length_last) const 
+// DONE-
+void P153_data_struct::getSentencesReceived(uint32_t& success, uint32_t& error, uint32_t& length_last) //const 
 {
-    succes      = success_count;
+    success     = success_count;
     error       = error_count;
     length_last = last_field_count;
 }
 
+// DONE-
 void P153_data_struct::setMaxLength(uint16_t maxlenght) 
 {
     max_length = maxlenght;
 }
 
-// DONE
+// DONE-
 // EISH: not sure about this
 void P153_data_struct::setLine(uint8_t varNr, const String& line) 
 {
@@ -254,7 +255,7 @@ void P153_data_struct::setLine(uint8_t varNr, const String& line)
     }
 }
 
-// DONE
+// DONE-
 String P153_data_struct::get_User_Label(int idx)
 {
         int real_idx = P153_FIRST_USER_LABEL_POS + idx;
@@ -268,21 +269,21 @@ String P153_data_struct::get_User_Label(int idx)
         }
 }
 
-// DONE-ish
+// DONE-ish-
 int P153_data_struct::get_Nr_User_LabelForms_Filled()
 {
     // Not sure if i'll be successful with this function
     return 1;
 }
 
-// DONE
+// DONE-
 int P153_data_struct::get_Nr_User_Labels()
 {
     return (_lines[P153_NR_USER_LABELS_POS]).toInt();
     //return 4;
 }
 
-// DONE
+// DONE-
 String P153_data_struct::repeat_char(char c, int num)
 {
     if(num <= 1)
@@ -297,7 +298,7 @@ String P153_data_struct::repeat_char(char c, int num)
     return result;
 }
 
-// DONE
+// DONE-
 void P153_data_struct::get_flattened_data(String& flattened_data, String* data_list, int num_data_fields)
 {
     flattened_data = "";
