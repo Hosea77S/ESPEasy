@@ -1,4 +1,4 @@
-#define PLUGINSTRUCTS_P153_DATA_STRUCT_H
+# define PLUGINSTRUCTS_P153_DATA_STRUCT_H
 
 # include "../../_Plugin_Helper.h"
 # include <ESPeasySerial.h>
