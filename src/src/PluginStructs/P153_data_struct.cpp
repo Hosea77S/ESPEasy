@@ -87,6 +87,10 @@ void P153_data_struct::sendData(uint8_t *data, size_t size)
 // DONE-
 bool P153_data_struct::loop() 
 {
+    currentState = P153_STATE_READ; //+
+    nextState = P153_STATE_READ; //+
+    field_count = 0; //+
+
     if (!isInitialized()) 
     {
         return false;
@@ -96,34 +100,34 @@ bool P153_data_struct::loop()
 
     if (easySerial != nullptr) 
     {
-        //int available = easySerial->available();
+        int available = easySerial->available(); //+
 
-        while (easySerial->available() > 0 && !fullDataReceived) 
+        while (available > 0 && !fullDataReceived) 
         {
-            char c = easySerial->read();
+            char c = easySerial->read(); 
             input_string += c;
-            //--available;
+            --available; //+
 
-            //if (available == 0) 
-            //{
-            //    available = easySerial->available();
-            //    delay(0);
-            //}
+            if (available == 0) //+
+            {
+                available = easySerial->available(); //+
+                delay(0); //+
+            } //+
 
             if(c == '\n')
             {
                 field_count += 1;
             }
 
-            if(input_string.length() > P153_MAX_STRING_LENGTH)
+            if((input_string.length() > P153_MAX_STRING_LENGTH) || (field_count>22)) //+
             {
-                last_field_count += field_count;
+                last_field_count = field_count;
                 error_count += 1;
                 field_count = 0;
                 nextState = P153_STATE_READ;
-                save_input_string();
+                //save_input_string(); //+
                 input_string = "";
-                break;
+                break; // exit the while loop
             }
 
             switch (currentState) 
