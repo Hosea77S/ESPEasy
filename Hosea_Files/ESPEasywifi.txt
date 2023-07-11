@@ -43,12 +43,12 @@ endon
 
 -----
 On MPPT#Value* do
- asyncevent,MPPTValue={substring:10:15:%eventvalue1%}
+ asyncevent,MPPTValue={substring:0:5:%eventvalue1%}
 endon
 
 on MPPTValue do
  logEntry,'MPPT Voltage = %eventvalue1%'
- TaskValueSet 4,1,%eventvalue%
+ TaskValueSet 4,1,%eventvalue1%
 endon
 -----
 ESP8266

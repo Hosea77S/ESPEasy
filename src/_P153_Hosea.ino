@@ -199,7 +199,7 @@ boolean Plugin_153(uint8_t function, struct EventStruct *event, String& string)
 
 		} // end PLUGIN_INIT
 
-		case PLUGIN_FIFTY_PER_SECOND:
+		case PLUGIN_TEN_PER_SECOND: //+++
 		{
 			// if TaskEnabled
 			// // Creat plugin datastruct

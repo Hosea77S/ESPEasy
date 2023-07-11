@@ -87,15 +87,13 @@ void P153_data_struct::sendData(uint8_t *data, size_t size)
 // DONE-
 bool P153_data_struct::loop() 
 {
-    currentState = P153_STATE_READ; //+
-    nextState = P153_STATE_READ; //+
-    field_count = 0; //+
-
     if (!isInitialized()) 
     {
         return false;
     }
-
+    currentState = P153_STATE_READ; //+
+    nextState = P153_STATE_READ; //+
+    field_count = 0; //+
     bool fullDataReceived = false;
 
     if (easySerial != nullptr) 
@@ -119,7 +117,7 @@ bool P153_data_struct::loop()
                 field_count += 1;
             }
 
-            if((input_string.length() > P153_MAX_STRING_LENGTH) || (field_count>22)) //+
+            if((input_string.length() > P153_MAX_STRING_LENGTH) || (field_count>22)) //+++
             {
                 last_field_count = field_count;
                 error_count += 1;
@@ -134,7 +132,7 @@ bool P153_data_struct::loop()
             {
                 case P153_STATE_READ:
                 {
-                    if(input_string.indexOf("Checksum\t")>0)
+                    if( input_string.indexOf("Checksum\t")>0 ) //+++
                     {
                         nextState =  P153_STATE_LAST_READ; 
                     }
@@ -202,7 +200,7 @@ bool P153_data_struct::getSentence(String& string)
     }
 
     get_flattened_data(string, user_data, nr_data_labels);
-    string += String(nr_data_labels) + "," + user_data_success;
+    string += String(nr_data_labels) + "," + user_data_success + "," + String(last_field_count);
 
     if (string.isEmpty()) 
     {
