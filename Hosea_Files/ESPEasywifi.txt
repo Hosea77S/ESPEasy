@@ -47,8 +47,29 @@ On MPPT#Value* do
 endon
 
 on MPPTValue do
- logEntry,'MPPT Voltage = %eventvalue1%'
  TaskValueSet 4,1,%eventvalue1%
+endon
+------------------------
+on Button#State=0 do
+
+  if [Relay#State]=0 and [Button#State]=0
+    TaskValueSet 6,1,1
+  else
+    TimerSet,1,3
+  endif
+
+  gpio,18,[Relay#State]
+
+endon
+
+on Rules#Timer=1 do
+
+  if [Relay#State]=1 and [Button#State]=0
+    TaskValueSet 6,1,0
+  endif
+
+  gpio,18,[Relay#State]
+
 endon
 -----
 ESP8266
