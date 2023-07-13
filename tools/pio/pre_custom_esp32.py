@@ -56,7 +56,7 @@ else:
     "-DUSES_P107",  # SI1145 UV index
 
     "-DUSES_P146",  # Cache Reader
-    "-DUSES_P153", ######### Hosea
+    "-DUSES_P153", ######### VictronMPPT
     
 
     "-DUSES_C016",  # Cache Controller
